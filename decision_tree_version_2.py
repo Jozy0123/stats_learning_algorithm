@@ -6,20 +6,28 @@ import numpy as np
 
 class TreeNode:  ## 决策树结点构造,通过字典的方法来表示
 
-    def __init__(self, feature_name=None, value=None, parent_node={}, sub_tree={}):
+    def __init__(self, feature_name=None, value=None, parent_node={}, sub_tree={}, relation=None):
         self.value = value
         self.parent_node = parent_node  ## dictionary (key是节点对应的特征值，value对应的是具体的特征)
         self.sub_tree = sub_tree
         self.feature_name = feature_name
+        self.relation = relation
 
     def add_subtree(self, subtree_root_node):
-        self.sub_tree.update(subtree_root_node.node_name())
+        if isinstance(subtree_root_node, TreeNode) == True:
+            self.node_name().update(subtree_root_node.node_name())
+        else:
+            self.node_name().update(subtree_root_node)
 
     def node_name(self):
         return {self.feature_name: self.sub_tree}
 
     def attach_to_node(self, parent_node):
         self.parent_node = parent_node
+
+
+
+
 
 
 class Tree:  ## 决策树构造，根结点，节点traverse
@@ -103,7 +111,7 @@ def subset_split(features, labels, feature_A_col): ## 按照特征把数据集�
     for j in feature_unique:
         feature_label_ = feature_label[(feature_label[:, feature_A_col] == j), :]
         subset.append(feature_label_)
-    return [np.delete(np.array(i), feature_A_col, 1) for i in subset]
+    return dict(zip(list(feature_unique),[np.delete(np.array(i), feature_A_col, 1) for i in subset]))
 
 
 
@@ -112,15 +120,20 @@ def ID3(dataset_features, dataset_labels, feature_names, epislon=0):
     feature_shape = dataset_features.shape
     feature_names_dict = dict(zip(range(feature_shape[1]), feature_names))
     if len(np.unique(dataset_labels)) == 1:
-        root_node = TreeNode(feature_name='label', value=np.unique(dataset_labels)[0])
-        return root_node
+        #root_node = TreeNode(feature_name='label', value=dataset_labels[0], sub_tree=dataset_labels[0])
+        #print(root_node.node_name())
+        #print('got to!')
+        return dataset_labels[0]
+        #return root_node
     # decision_tree = Tree(root_node, is_root=True)
 
     elif feature_shape[1] == 0:
         (value, counts) = np.unique(dataset_labels, return_counts=True)
         index = np.argmax(counts)
-        root_node = TreeNode(feature_name='label', value=value[index])
-        return root_node
+        print('yes')
+        #root_node = TreeNode(feature_name='label', value=value[index], sub_tree=value[index])
+        #print(root_node.node_name())
+        return value[index]
 
     else:
     ### 找到entropy增加最大的特征
@@ -128,33 +141,51 @@ def ID3(dataset_features, dataset_labels, feature_names, epislon=0):
         if max(information_gain_entropy) <= epislon:
             (value, counts) = np.unique(dataset_labels, return_counts=True)
             index = np.argmax(counts)
-            root_node = TreeNode(feature_name='label', value=value[index])
-            return root_node
+            #root_node = TreeNode(feature_name='label', value=value[index], sub_tree=value[index])
+            return value[index]
 
         else:
             max_entropy_gain_col_num = np.argmax(np.array(information_gain_entropy))
             max_entropy_feature = feature_names_dict[max_entropy_gain_col_num]
             root_node = TreeNode(feature_name=max_entropy_feature)
-            feature_names.remove(max_entropy_feature)
-            for subset in subset_split(dataset_features, dataset_labels, max_entropy_gain_col_num):
+            #print(root_node.node_name())
+            tree = {max_entropy_feature:{}}
+            del(feature_names[max_entropy_gain_col_num])
+            #unique_values_feature = np.unique(dataset_features[:,max_entropy_gain_col_num])
+            #feature_names.remove(max_entropy_feature)
+            print('______________________________________________')
+            print(subset_split(dataset_features, dataset_labels, max_entropy_gain_col_num))
+            print('_______________________________________________')
+            for unique_values_feature, subset in subset_split(dataset_features, dataset_labels, max_entropy_gain_col_num).items():
+                print(subset)
+                print(unique_values_feature)
                 subset_features = subset[:, :-1]
-                subset_labels = subset[:, -1]
-                root_node.add_subtree(ID3(subset_features, subset_labels, feature_names))
-        return root_node
+                print(subset_features)
+                subset_labels = subset[:, -1].flatten()
+                print(subset_labels)
+                print(max_entropy_feature)
+                subtree_ = ID3(subset_features, subset_labels, feature_names)
+                tree[max_entropy_feature][unique_values_feature] = subtree_
+                #root_node.sub_tree[unique_values_feature]=subtree_
+                #for i in np.unique(subset_labels):
+                    #root_node.sub_tree[max_entropy_feature][i] = ID3(subset_features, subset_labels, feature_names).node_name()
+                    #tree[max_entropy_feature][i]= ID3(subset_features, subset_labels, feature_names)
+                #tree[max_entropy_feature][subset_labels[0]]=ID3(subset_features, subset_labels, feature_names)
+            return tree
 
 def C45(dataset_features, dataset_labels, feature_names, epislon=0):
     feature_shape = dataset_features.shape
     feature_names_dict = dict(zip(range(feature_shape[1]), feature_names))
     if len(np.unique(dataset_labels)) == 1:
         root_node = TreeNode(feature_name='label', value=np.unique(dataset_labels)[0])
-        return root_node
+        return np.unique(dataset_labels)[0]
     # decision_tree = Tree(root_node, is_root=True)
 
     elif feature_shape[1] == 0:
         (value, counts) = np.unique(dataset_labels, return_counts=True)
         index = np.argmax(counts)
         root_node = TreeNode(feature_name='label', value=value[index])
-        return root_node
+        return value[index]
 
     else:
     ### 找到entropy增加最大的特征
@@ -163,18 +194,21 @@ def C45(dataset_features, dataset_labels, feature_names, epislon=0):
             (value, counts) = np.unique(dataset_labels, return_counts=True)
             index = np.argmax(counts)
             root_node = TreeNode(feature_name='label', value=value[index])
-            return root_node
+            return value[index]
 
         else:
             max_entropy_gain_col_num = np.argmax(np.array(information_gain_entropy))
             max_entropy_feature = feature_names_dict[max_entropy_gain_col_num]
             root_node = TreeNode(feature_name=max_entropy_feature)
             feature_names.remove(max_entropy_feature)
-            for subset in subset_split(dataset_features, dataset_labels, max_entropy_gain_col_num):
+            tree = {max_entropy_feature:{}}
+            for value, subset in subset_split(dataset_features, dataset_labels, max_entropy_gain_col_num).items():
                 subset_features = subset[:, :-1]
                 subset_labels = subset[:, -1]
-                root_node.add_subtree(ID3(subset_features, subset_labels, feature_names))
-        return root_node
+                subtree = C45(subset_features, subset_labels, feature_names)
+                tree[max_entropy_feature][value] = subtree
+                #root_node.add_subtree(C45(subset_features, subset_labels, feature_names))
+        return tree
 
 
 
@@ -185,7 +219,8 @@ a = np.array([[1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3], [0, 0, 1, 1, 0, 0, 
 # a = np.array([1,1,1,1,1,2,2,2,2,2,3,3,3,3,3])
 b = np.array([0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0])
 
-print(ID3(a.T,b,feature_names = ['age','is_working','has_house','credit_history']).node_name())
+
+print(C45(a.T,b,feature_names = ['age','is_working','has_house','credit_history']))
 
 
 
